@@ -1,6 +1,6 @@
 import numpy as np
 from math import cos, sin, tan, pi, atan2, acos
-from random import random, uniform
+from random import random, uniform, randint
 from gym import spaces
 
 
@@ -11,7 +11,7 @@ class UAVModel(object):
         # 无人机的标识
         self.id = None
         self.enemy = None
-        self.size = 0.04
+        self.size = 0.02
         self.color = None
         # 无人机的状态
         self.pos = np.zeros(2)
@@ -74,20 +74,30 @@ class Battle(object):
 
     def reset(self):
         self.t = 0
+        # reset render
+        self.render_geoms = None
+        self.render_geoms_xform = None
+        random_side = randint(0, 1)
         for i, UAV in enumerate(self.UAVs):
-            UAV.pos = np.random.uniform([-1, -1], [1, 1], (2,))
-            UAV.speed = random() * (UAV.speed_max - UAV.speed_min) + UAV.speed_min
-            UAV.vel = UAV.speed * np.array([cos(UAV.yaw), sin(UAV.yaw)])
-            UAV.yaw = uniform(-1, 1) * pi
-            UAV.roll = 0 #random() * (UAV.roll_max - UAV.roll_min) + UAV.roll_min
             UAV.being_attacked = False
             UAV.death = False
-            # reset render
-            self.render_geoms = None
-            self.render_geoms_xform = None
+            if not UAV.enemy:
+                interval = 2.0 / (self.num_RUAVs + 1)
+                UAV.pos = np.array([random_side*1.8-0.9, 1 - (i+1)*interval])
+                UAV.speed = random() * (UAV.speed_max - UAV.speed_min) + UAV.speed_min
+                UAV.yaw = pi * random_side
+                UAV.vel = UAV.speed * np.array([cos(UAV.yaw), sin(UAV.yaw)])
+                UAV.roll = random() * (UAV.roll_max - UAV.roll_min) + UAV.roll_min
+            else:
+                interval = 2.0 / (self.num_BUAVs + 1)
+                UAV.pos = np.array([(1 - random_side) * 1.8 - 0.9, 1 - (i - self.num_RUAVs + 1) * interval])
+                UAV.speed = random() * (UAV.speed_max - UAV.speed_min) + UAV.speed_min
+                UAV.yaw = pi * (1-random_side)
+                UAV.vel = UAV.speed * np.array([cos(UAV.yaw), sin(UAV.yaw)])
+                UAV.roll = random() * (UAV.roll_max - UAV.roll_min) + UAV.roll_min
 
     def step(self, r_actions, b_actions):
-        acceleration = 0.005     # m/s2
+        acceleration = 0.01     # m/s2
         omega = pi / 12         # rad/s
         actions = r_actions + b_actions
         for UAV, action in zip(self.UAVs, actions):
@@ -96,7 +106,7 @@ class Battle(object):
             UAV.speed = np.clip(UAV.speed, UAV.speed_min, UAV.speed_max)
             UAV.roll += action[1] * omega * self.dt
             UAV.roll = np.clip(UAV.roll, UAV.roll_min, UAV.roll_max)
-            UAV.yaw -= 0.00098 / UAV.speed * tan(UAV.roll) * self.dt
+            UAV.yaw -= 0.004 / UAV.speed * tan(UAV.roll) * self.dt
             UAV.yaw = atan2(sin(UAV.yaw), cos(UAV.yaw))     # map yaw to [-pi, +pi]
             UAV.vel = UAV.speed * np.array([cos(UAV.yaw), sin(UAV.yaw)])
             UAV.pos += UAV.vel * self.dt
@@ -216,31 +226,31 @@ class Battle(object):
                 # Blue UAV's reward
                 relative_pos = RUAV.pos - BUAV.pos
                 distance = np.linalg.norm(relative_pos)
-                attack_angle = acos(relative_pos.dot(BUAV.vel) / (BUAV.speed * distance))
+                attack_angle = acos(np.clip(relative_pos.dot(BUAV.vel) / (BUAV.speed * distance), -1, 1))
                 if attack_angle < BUAV.attack_angle and distance < BUAV.attack_range:
-                    b_launch_attack[adv_idx] = True
                     # 敌方在这一时刻未被其它队友击中，并且此无人机未在此时刻发起攻击
                     if (not RUAV.being_attacked) and (not b_launch_attack[adv_idx]):
-                        hit = random() > hit_prob
+                        hit = random() < hit_prob
                         RUAV.being_attacked = hit
                         if hit:
                             b_reward_n[adv_idx] += 5.0  # killing an enemy
                         else:
                             b_reward_n[adv_idx] += 0.2  # attacking an enemy
                         r_reward_n[ally_idx] -= 0.1  # being attacked or killed
+                    b_launch_attack[adv_idx] = True
                 # Red UAV's reward
                 relative_pos = -relative_pos
-                attack_angle = acos(relative_pos.dot(RUAV.vel) / (RUAV.speed * distance))
+                attack_angle = acos(np.clip(relative_pos.dot(RUAV.vel) / (RUAV.speed * distance), -1, 1))
                 if attack_angle < RUAV.attack_angle and distance < RUAV.attack_range:
-                    r_launch_attack[ally_idx] = True
                     if (not BUAV.being_attacked) and (not r_launch_attack[ally_idx]):
-                        hit = random() > hit_prob
+                        hit = random() < hit_prob
                         BUAV.being_attacked = hit
                         if hit:
                             r_reward_n[ally_idx] += 5.0
                         else:
                             r_reward_n[ally_idx] += 0.2
                         b_reward_n[adv_idx] -= 0.1
+                    r_launch_attack[ally_idx] = True
                 # collision
                 if distance < RUAV.size + BUAV.size + 0.02:
                     b_reward_n[adv_idx] -= 0.1
@@ -271,7 +281,7 @@ class Battle(object):
             self.render_geoms_xform = []
             for UAV in self.UAVs:
                 xform = rendering.Transform()
-                for x in rendering.make_UAV(0.5 * UAV.size):
+                for x in rendering.make_UAV(UAV.size):
                     x.set_color(*UAV.color)
                     x.add_attr(xform)
                     self.render_geoms.append(x)
@@ -283,7 +293,7 @@ class Battle(object):
                 # self.render_geoms.append(circle)
                 # self.render_geoms_xform.append(xform)
                 # render attack range
-                sector = rendering.make_sector(radius=0.1, theta=np.pi/4)
+                sector = rendering.make_sector(radius=UAV.attack_range, theta=2*UAV.attack_angle)
                 sector.set_color(*UAV.color, 0.2)
                 sector.add_attr(xform)
                 self.render_geoms.append(sector)

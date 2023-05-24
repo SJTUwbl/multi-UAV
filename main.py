@@ -10,8 +10,8 @@ def get_args():
     parser.add_argument("--max-episode-len", type=int, default=1200, help="maximum episode length")
     parser.add_argument("--num-RUAVs", type=int, default=6, help="number of red UAVs")
     parser.add_argument("--num-BUAVs", type=int, default=6, help="number of blue UAVs")
-    parser.add_argument("--speed-max", type=float, default=0.01, help="")
-    parser.add_argument("--speed-min", type=float, default=0.005, help="")
+    parser.add_argument("--speed-max", type=float, default=0.05, help="")
+    parser.add_argument("--speed-min", type=float, default=0.01, help="")
     parser.add_argument("--roll-max", type=float, default=+pi / 3, help="")
     parser.add_argument("--roll-min", type=float, default=-pi / 3, help="")
     parser.add_argument("--detect-range", type=float, default=0.5, help="")
@@ -33,10 +33,12 @@ def main():
             time.sleep(0.1)
             env.render()
         r_obs_n, b_obs_n = env.get_obs()
-        r_action_n = [[0, -1] for i in range(args.num_RUAVs)]
-        b_action_n = [b_action_spaces[i].sample() for i in range(args.num_BUAVs)]
+        r_action_n = [[0, 0] for i in range(args.num_RUAVs)]
+        b_action_n = [[0, 0] for i in range(args.num_BUAVs)]
         r_reward_n, b_reward_n, r_reward_n, b_reward_n, done = env.step(r_action_n, b_action_n)
-
+        if done:
+            print("episode done!")
+            break
 
 if __name__ == "__main__":
     main()
