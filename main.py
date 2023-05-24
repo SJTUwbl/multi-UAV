@@ -12,8 +12,8 @@ def get_args():
     parser.add_argument("--num-BUAVs", type=int, default=6, help="number of blue UAVs")
     parser.add_argument("--speed-max", type=float, default=0.01, help="")
     parser.add_argument("--speed-min", type=float, default=0.005, help="")
-    parser.add_argument("--roll-max", type=float, default=+pi / 2, help="")
-    parser.add_argument("--roll-min", type=float, default=-pi / 2, help="")
+    parser.add_argument("--roll-max", type=float, default=+pi / 3, help="")
+    parser.add_argument("--roll-min", type=float, default=-pi / 3, help="")
     parser.add_argument("--detect-range", type=float, default=0.5, help="")
     parser.add_argument("--attack-range", type=float, default=0.15, help="")
     parser.add_argument("--attack-angle", type=float, default=pi / 8, help="")
@@ -33,7 +33,7 @@ def main():
             time.sleep(0.1)
             env.render()
         r_obs_n, b_obs_n = env.get_obs()
-        r_action_n = [r_action_spaces[i].sample() for i in range(args.num_RUAVs)]
+        r_action_n = [[0, -1] for i in range(args.num_RUAVs)]
         b_action_n = [b_action_spaces[i].sample() for i in range(args.num_BUAVs)]
         r_reward_n, b_reward_n, r_reward_n, b_reward_n, done = env.step(r_action_n, b_action_n)
 

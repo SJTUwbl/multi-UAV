@@ -79,7 +79,7 @@ class Battle(object):
             UAV.speed = random() * (UAV.speed_max - UAV.speed_min) + UAV.speed_min
             UAV.vel = UAV.speed * np.array([cos(UAV.yaw), sin(UAV.yaw)])
             UAV.yaw = uniform(-1, 1) * pi
-            UAV.roll = random() * (UAV.roll_max - UAV.roll_min) + UAV.roll_min
+            UAV.roll = 0 #random() * (UAV.roll_max - UAV.roll_min) + UAV.roll_min
             UAV.being_attacked = False
             UAV.death = False
             # reset render
@@ -87,7 +87,7 @@ class Battle(object):
             self.render_geoms_xform = None
 
     def step(self, r_actions, b_actions):
-        acceleration = 0.05     # m/s2
+        acceleration = 0.005     # m/s2
         omega = pi / 12         # rad/s
         actions = r_actions + b_actions
         for UAV, action in zip(self.UAVs, actions):
@@ -96,7 +96,7 @@ class Battle(object):
             UAV.speed = np.clip(UAV.speed, UAV.speed_min, UAV.speed_max)
             UAV.roll += action[1] * omega * self.dt
             UAV.roll = np.clip(UAV.roll, UAV.roll_min, UAV.roll_max)
-            UAV.yaw -= 9.8 / UAV.speed * tan(UAV.roll) * self.dt
+            UAV.yaw -= 0.00098 / UAV.speed * tan(UAV.roll) * self.dt
             UAV.yaw = atan2(sin(UAV.yaw), cos(UAV.yaw))     # map yaw to [-pi, +pi]
             UAV.vel = UAV.speed * np.array([cos(UAV.yaw), sin(UAV.yaw)])
             UAV.pos += UAV.vel * self.dt
