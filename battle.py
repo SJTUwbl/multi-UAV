@@ -111,10 +111,10 @@ class Battle(object):
             UAV.vel = UAV.speed * np.array([cos(UAV.yaw), sin(UAV.yaw)])
             UAV.pos += UAV.vel * self.dt
             UAV.pos = UAV.pos.clip(-0.98, 0.98)
-        r_obs_n, b_obs_n = self.get_obs()
         r_reward_n, b_reward_n = self.get_reward()
-        done = self.get_done()
-        return r_obs_n, b_obs_n, r_reward_n, b_reward_n, done
+        r_dones, b_dones = self.get_done()
+        terminate = self.get_terminate()
+        return r_reward_n, b_reward_n, r_dones, b_dones, terminate
 
     def get_obs(self):
         r_obs_n = []
@@ -126,37 +126,38 @@ class Battle(object):
             ally_alive_mask = np.zeros((self.num_RUAVs - 1,), dtype=np.float32)
             adv_alive_mask = np.zeros((self.num_BUAVs,), dtype=np.float32)
             own = self.RUAVs[i]
-            own_feat[0:2] = own.pos
-            own_feat[2:4] = own.vel
-            own_feat[4] = own.speed
-            own_feat[5] = own.yaw
-            own_feat[6] = own.roll
-            ally_idx = 0
-            for ally in self.RUAVs:
-                if ally is own: continue
-                if not ally.death:
-                    relative_pos = ally.pos - own.pos
-                    distance = np.linalg.norm(relative_pos)
-                    ally_feats[ally_idx, 0:2] = relative_pos
-                    ally_feats[ally_idx, 2] = distance
-                    ally_feats[ally_idx, 3] = ally.yaw - own.yaw
-                    ally_feats[ally_idx, 4] = ally.roll
-                    ally_alive_mask[ally_idx] = 1
-                else:
-                    ally_alive_mask[ally_idx] = 0
-                ally_idx += 1
-            for adv_idx, adv in enumerate(self.BUAVs):
-                if not adv.death:
-                    relative_pos = adv.pos - own.pos
-                    distance = np.linalg.norm(relative_pos)
-                    adv_feats[adv_idx, 0:2] = relative_pos
-                    adv_feats[adv_idx, 2] = distance
-                    adv_feats[adv_idx, 3] = atan2(relative_pos[1], relative_pos[0])
-                    adv_feats[adv_idx, 4] = adv.yaw - own.yaw
-                    adv_feats[adv_idx, 5] = adv.roll
-                    adv_alive_mask[adv_idx] = 1
-                else:
-                    adv_alive_mask[adv_idx] = 0
+            if not own.death:
+                own_feat[0:2] = own.pos
+                own_feat[2:4] = own.vel
+                own_feat[4] = own.speed
+                own_feat[5] = own.yaw
+                own_feat[6] = own.roll
+                ally_idx = 0
+                for ally in self.RUAVs:
+                    if ally is own: continue
+                    if not ally.death:
+                        relative_pos = ally.pos - own.pos
+                        distance = np.linalg.norm(relative_pos)
+                        ally_feats[ally_idx, 0:2] = relative_pos
+                        ally_feats[ally_idx, 2] = distance
+                        ally_feats[ally_idx, 3] = ally.yaw - own.yaw
+                        ally_feats[ally_idx, 4] = ally.roll
+                        ally_alive_mask[ally_idx] = 1
+                    else:
+                        ally_alive_mask[ally_idx] = 0
+                    ally_idx += 1
+                for adv_idx, adv in enumerate(self.BUAVs):
+                    if not adv.death:
+                        relative_pos = adv.pos - own.pos
+                        distance = np.linalg.norm(relative_pos)
+                        adv_feats[adv_idx, 0:2] = relative_pos
+                        adv_feats[adv_idx, 2] = distance
+                        adv_feats[adv_idx, 3] = atan2(relative_pos[1], relative_pos[0])
+                        adv_feats[adv_idx, 4] = adv.yaw - own.yaw
+                        adv_feats[adv_idx, 5] = adv.roll
+                        adv_alive_mask[adv_idx] = 1
+                    else:
+                        adv_alive_mask[adv_idx] = 0
             r_obs = np.concatenate([
                 own_feat.flatten(),
                 ally_feats.flatten(),
@@ -172,37 +173,38 @@ class Battle(object):
             ally_alive_mask = np.zeros((self.num_BUAVs - 1,), dtype=np.float32)
             adv_alive_mask = np.zeros((self.num_RUAVs,), dtype=np.float32)
             own = self.BUAVs[i]
-            own_feat[0:2] = own.pos
-            own_feat[2:4] = own.vel
-            own_feat[4] = own.speed
-            own_feat[5] = own.yaw
-            own_feat[6] = own.roll
-            ally_idx = 0
-            for ally in self.BUAVs:
-                if ally is own: continue
-                if not ally.death:
-                    relative_pos = ally.pos - own.pos
-                    distance = np.linalg.norm(relative_pos)
-                    ally_feats[ally_idx, 0:2] = relative_pos
-                    ally_feats[ally_idx, 2] = distance
-                    ally_feats[ally_idx, 3] = ally.yaw - own.yaw
-                    ally_feats[ally_idx, 4] = ally.roll
-                    ally_alive_mask[ally_idx] = 1
-                else:
-                    ally_alive_mask[ally_idx] = 0
-                ally_idx += 1
-            for adv_idx, adv in enumerate(self.RUAVs):
-                if not adv.death:
-                    relative_pos = adv.pos - own.pos
-                    distance = np.linalg.norm(relative_pos)
-                    adv_feats[adv_idx, 0:2] = relative_pos
-                    adv_feats[adv_idx, 2] = distance
-                    adv_feats[adv_idx, 3] = atan2(relative_pos[1], relative_pos[0])
-                    adv_feats[adv_idx, 4] = adv.yaw - own.yaw
-                    adv_feats[adv_idx, 5] = adv.roll
-                    adv_alive_mask[adv_idx] = 1
-                else:
-                    adv_alive_mask[adv_idx] = 0
+            if not own.death:
+                own_feat[0:2] = own.pos
+                own_feat[2:4] = own.vel
+                own_feat[4] = own.speed
+                own_feat[5] = own.yaw
+                own_feat[6] = own.roll
+                ally_idx = 0
+                for ally in self.BUAVs:
+                    if ally is own: continue
+                    if not ally.death:
+                        relative_pos = ally.pos - own.pos
+                        distance = np.linalg.norm(relative_pos)
+                        ally_feats[ally_idx, 0:2] = relative_pos
+                        ally_feats[ally_idx, 2] = distance
+                        ally_feats[ally_idx, 3] = ally.yaw - own.yaw
+                        ally_feats[ally_idx, 4] = ally.roll
+                        ally_alive_mask[ally_idx] = 1
+                    else:
+                        ally_alive_mask[ally_idx] = 0
+                    ally_idx += 1
+                for adv_idx, adv in enumerate(self.RUAVs):
+                    if not adv.death:
+                        relative_pos = adv.pos - own.pos
+                        distance = np.linalg.norm(relative_pos)
+                        adv_feats[adv_idx, 0:2] = relative_pos
+                        adv_feats[adv_idx, 2] = distance
+                        adv_feats[adv_idx, 3] = atan2(relative_pos[1], relative_pos[0])
+                        adv_feats[adv_idx, 4] = adv.yaw - own.yaw
+                        adv_feats[adv_idx, 5] = adv.roll
+                        adv_alive_mask[adv_idx] = 1
+                    else:
+                        adv_alive_mask[adv_idx] = 0
             b_obs = np.concatenate([
                 own_feat.flatten(),
                 ally_feats.flatten(),
@@ -262,6 +264,11 @@ class Battle(object):
         return r_reward_n, b_reward_n
 
     def get_done(self):
+        r_alive = np.array([UAV.being_attacked for UAV in self.RUAVs], dtype=np.float32)
+        b_alive = np.array([UAV.being_attacked for UAV in self.BUAVs], dtype=np.float32)
+        return r_alive, b_alive
+
+    def get_terminate(self):
         r_alive = [UAV.being_attacked for UAV in self.RUAVs]
         b_alive = [UAV.being_attacked for UAV in self.BUAVs]
         if all(r_alive) or all(b_alive):

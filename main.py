@@ -8,8 +8,8 @@ def get_args():
     parser = argparse.ArgumentParser("UAV swarm confrontation")
     # Environment
     parser.add_argument("--max-episode-len", type=int, default=1200, help="maximum episode length")
-    parser.add_argument("--num-RUAVs", type=int, default=6, help="number of red UAVs")
-    parser.add_argument("--num-BUAVs", type=int, default=6, help="number of blue UAVs")
+    parser.add_argument("--num-RUAVs", type=int, default=1, help="number of red UAVs")
+    parser.add_argument("--num-BUAVs", type=int, default=2, help="number of blue UAVs")
     parser.add_argument("--speed-max", type=float, default=0.05, help="")
     parser.add_argument("--speed-min", type=float, default=0.01, help="")
     parser.add_argument("--roll-max", type=float, default=+pi / 3, help="")
@@ -35,10 +35,11 @@ def main():
         r_obs_n, b_obs_n = env.get_obs()
         r_action_n = [[0, 0] for i in range(args.num_RUAVs)]
         b_action_n = [[0, 0] for i in range(args.num_BUAVs)]
-        r_reward_n, b_reward_n, r_reward_n, b_reward_n, done = env.step(r_action_n, b_action_n)
-        if done:
+        r_reward_n, b_reward_n, r_dones, b_dones, terminate = env.step(r_action_n, b_action_n)
+        if terminate:
             print("episode done!")
             break
+
 
 if __name__ == "__main__":
     main()
